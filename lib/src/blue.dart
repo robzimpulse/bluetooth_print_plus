@@ -17,6 +17,14 @@ class BluetoothPrintPlus {
       _methodStream.add(call);
     });
     _state.listen((event) {});
+    _methodStream.stream
+        .where((m) => m.method == "PairResult")
+        .map((m) => m.arguments as int)
+        .listen((bondState) {
+      if (bondState == 10) _pairState.add(PairState.none);
+      if (bondState == 11) _pairState.add(PairState.bonding);
+      if (bondState == 12) _pairState.add(PairState.bonded);
+    });
   }
 
   /// native platform methods channel
@@ -40,6 +48,10 @@ class BluetoothPrintPlus {
   static final _connectState = StreamControllerReEmit<ConnectState>(
       initialValue: ConnectState.disconnected);
 
+  /// stream used for the pairState public api
+  static final _pairState =
+      StreamControllerReEmit<PairState>(initialValue: PairState.none);
+
   /// stream used for the isBlueOn public api
   static final _blueState =
       StreamControllerReEmit<BlueState>(initialValue: BlueState.blueOn);
@@ -57,6 +69,9 @@ class BluetoothPrintPlus {
 
   /// returns connect state as a stream
   static Stream<ConnectState> get connectState => _connectState.stream;
+
+  /// returns pair/bond state as a stream (Android only; never emitted on iOS)
+  static Stream<PairState> get pairState => _pairState.stream;
 
   /// returns blue state as a stream
   static Stream<BlueState> get blueState => _blueState.stream;
@@ -125,6 +140,40 @@ class BluetoothPrintPlus {
     return result
         .map((e) => BluetoothDevice.fromJson(Map<String, dynamic>.from(e)))
         .toList();
+  }
+
+  /// Initiates OS-level pairing with [device].
+  ///
+  /// On Android, this calls `BluetoothDevice.createBond()` which shows the
+  /// system pairing dialog. Monitor [pairState] to track the result:
+  /// it will emit [PairState.bonding] then [PairState.bonded] on success,
+  /// or [PairState.none] on failure/cancellation.
+  ///
+  /// On iOS, pairing is managed transparently by the OS and this method
+  /// throws a [PlatformException] with code `not_supported`.
+  ///
+  /// Returns `true` if the pairing request was accepted by the OS,
+  /// `false` if the device was already bonded or the request was rejected.
+  static Future<bool> pair(BluetoothDevice device) async {
+    _initFlutterBluePlus();
+    final result =
+        await _methodChannel.invokeMethod('pair', {'address': device.address});
+    return result == true;
+  }
+
+  /// Removes the OS-level bond with [device].
+  ///
+  /// On Android, this calls the hidden `BluetoothDevice.removeBond()` API
+  /// via reflection. [pairState] will emit [PairState.none] on success.
+  ///
+  /// On iOS, this method throws a [PlatformException] with code `not_supported`.
+  ///
+  /// Returns `true` if the bond was removed successfully.
+  static Future<bool> unpair(BluetoothDevice device) async {
+    _initFlutterBluePlus();
+    final result = await _methodChannel
+        .invokeMethod('unpair', {'address': device.address});
+    return result == true;
   }
 
   /// Connect to a Bluetooth device.
