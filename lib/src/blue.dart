@@ -111,6 +111,22 @@ class BluetoothPrintPlus {
     }
   }
 
+  /// Returns the list of devices bonded/paired to the system.
+  ///
+  /// On Android, this returns Classic Bluetooth devices that have been paired
+  /// via the OS settings — no scanning required.
+  ///
+  /// On iOS, this always returns an empty list because the OS does not expose
+  /// the bonded device list to third-party apps for Classic Bluetooth.
+  static Future<List<BluetoothDevice>> getBondedDevices() async {
+    _initFlutterBluePlus();
+    final List result =
+        await _methodChannel.invokeMethod('getBondedDevices') ?? [];
+    return result
+        .map((e) => BluetoothDevice.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
   /// Connect to a Bluetooth device.
   ///
   /// [device] The device must have been previously discovered in a scan.

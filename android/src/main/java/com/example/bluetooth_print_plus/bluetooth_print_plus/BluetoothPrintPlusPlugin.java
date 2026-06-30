@@ -42,9 +42,12 @@ import io.flutter.plugin.common.PluginRegistry.RequestPermissionsResultListener;
 import pub.devrel.easypermissions.EasyPermissions;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * BluetoothPrintPlusPlugin
@@ -181,6 +184,9 @@ public class BluetoothPrintPlusPlugin
         connect(address);
         result.success(null);
         break;
+      case "getBondedDevices":
+        getBondedDevices(result);
+        break;
       case "disconnect":
         Printer.close();
         result.success(null);
@@ -228,6 +234,24 @@ public class BluetoothPrintPlusPlugin
       }
     }
   };
+
+  private void getBondedDevices(Result result) {
+    try {
+      Set<BluetoothDevice> bondedDevices = mBluetoothAdapter.getBondedDevices();
+      List<Map<String, Object>> devices = new ArrayList<>();
+      for (BluetoothDevice device : bondedDevices) {
+        if (device.getType() == BluetoothDevice.DEVICE_TYPE_LE) continue;
+        Map<String, Object> map = new HashMap<>();
+        map.put("name", device.getName() != null ? device.getName() : "");
+        map.put("address", device.getAddress());
+        map.put("type", device.getType());
+        devices.add(map);
+      }
+      result.success(devices);
+    } catch (SecurityException e) {
+      result.error("permission_denied", "BLUETOOTH_CONNECT permission required", null);
+    }
+  }
 
   private void state(Result result) {
     try {
