@@ -187,6 +187,16 @@ public class BluetoothPrintPlusPlugin
       case "getBondedDevices":
         getBondedDevices(result);
         break;
+      case "pair":
+        Map<String, Object> pairArgs = call.arguments();
+        assert pairArgs != null;
+        pair((String) pairArgs.get("address"), result);
+        break;
+      case "unpair":
+        Map<String, Object> unpairArgs = call.arguments();
+        assert unpairArgs != null;
+        unpair((String) unpairArgs.get("address"), result);
+        break;
       case "disconnect":
         Printer.close();
         result.success(null);
@@ -210,6 +220,7 @@ public class BluetoothPrintPlusPlugin
       IntentFilter filter = new IntentFilter();
       filter.addAction(BluetoothDevice.ACTION_FOUND);
       filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+      filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
       context.registerReceiver(mFindBlueToothReceiver, filter);
     } catch (Exception ignored) {
 
@@ -231,6 +242,10 @@ public class BluetoothPrintPlusPlugin
         parameter.setBluetoothStrength(rssi + "");
         LogUtils.i(TAG, "\nBlueToothName: " + device.getName() + "\nMacAddress: " + device.getAddress() + "\nrssi: " + rssi);
         invokeMethodUIThread(device);
+      } else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+        int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE);
+        new Handler(Looper.getMainLooper()).post(() ->
+            channel.invokeMethod("PairResult", bondState));
       }
     }
   };
@@ -250,6 +265,38 @@ public class BluetoothPrintPlusPlugin
       result.success(devices);
     } catch (SecurityException e) {
       result.error("permission_denied", "BLUETOOTH_CONNECT permission required", null);
+    }
+  }
+
+  private void pair(String address, Result result) {
+    try {
+      BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
+      if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
+        result.success(false);
+        return;
+      }
+      result.success(device.createBond());
+    } catch (SecurityException e) {
+      result.error("permission_denied", "BLUETOOTH_CONNECT permission required", null);
+    } catch (IllegalArgumentException e) {
+      result.error("invalid_address", "Invalid Bluetooth address: " + address, null);
+    }
+  }
+
+  private void unpair(String address, Result result) {
+    try {
+      BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
+      if (device.getBondState() == BluetoothDevice.BOND_NONE) {
+        result.success(false);
+        return;
+      }
+      java.lang.reflect.Method removeBond =
+          BluetoothDevice.class.getMethod("removeBond");
+      result.success((Boolean) removeBond.invoke(device));
+    } catch (SecurityException e) {
+      result.error("permission_denied", "BLUETOOTH_CONNECT permission required", null);
+    } catch (Exception e) {
+      result.error("unpair_failed", e.getMessage(), null);
     }
   }
 

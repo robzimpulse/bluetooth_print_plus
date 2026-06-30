@@ -4,6 +4,10 @@ enum BlueState { blueOn, blueOff }
 /// ConnectState
 enum ConnectState { connected, disconnected }
 
+/// PairState — mirrors Android BluetoothDevice bond constants (10/11/12).
+/// On iOS, pairing is OS-managed; this state is never emitted.
+enum PairState { none, bonding, bonded }
+
 /// Rotation
 enum Rotation { r_0, r_90, r_180, r_270 }
 
