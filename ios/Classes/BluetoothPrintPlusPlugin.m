@@ -115,6 +115,9 @@ typedef NS_ENUM(NSInteger, BPPState) {
         } @catch(FlutterError *e) {
             result(e);
         }
+    } else if([@"getBondedDevices" isEqualToString:call.method]) {
+        // iOS does not expose a bonded/paired device list for Classic BT to third-party apps.
+        result(@[]);
     } else if([@"disconnect" isEqualToString:call.method]) {
         @try {
             [Manager close];
