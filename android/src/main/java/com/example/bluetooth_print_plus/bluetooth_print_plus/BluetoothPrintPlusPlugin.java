@@ -222,6 +222,8 @@ public class BluetoothPrintPlusPlugin
       filter.addAction(BluetoothDevice.ACTION_FOUND);
       filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
       filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+      filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+      filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
       context.registerReceiver(mFindBlueToothReceiver, filter);
     } catch (Exception ignored) {
 
@@ -247,6 +249,12 @@ public class BluetoothPrintPlusPlugin
         int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE);
         new Handler(Looper.getMainLooper()).post(() ->
             channel.invokeMethod("PairResult", bondState));
+      } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        if (device != null) invokeAclConnectionChanged(device, true);
+      } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        if (device != null) invokeAclConnectionChanged(device, false);
       }
     }
   };
@@ -367,6 +375,20 @@ public class BluetoothPrintPlusPlugin
         LogUtils.w(TAG, "invokeMethodUIThread: tried to call method on closed channel: " + "ScanResult");
       }
     });
+  }
+
+  private void invokeAclConnectionChanged(BluetoothDevice device, boolean connected) {
+    final Map<String, Object> ret = new HashMap<>();
+    ret.put("address", device.getAddress());
+    ret.put("name", device.getName() != null ? device.getName() : "");
+    ret.put("type", device.getType());
+    android.bluetooth.BluetoothClass btClass = device.getBluetoothClass();
+    ret.put("majorClass", btClass != null ? btClass.getMajorDeviceClass() : 0);
+    ret.put("deviceClass", btClass != null ? btClass.getDeviceClass() : 0);
+    ret.put("bondState", device.getBondState());
+    ret.put("isConnected", connected);
+    new Handler(Looper.getMainLooper()).post(() ->
+        channel.invokeMethod("AclConnectionChanged", ret));
   }
 
   private void startScan() throws IllegalStateException {
