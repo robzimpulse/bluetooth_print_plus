@@ -25,6 +25,10 @@ class BluetoothPrintPlus {
       if (bondState == 11) _pairState.add(PairState.bonding);
       if (bondState == 12) _pairState.add(PairState.bonded);
     });
+    _methodStream.stream
+        .where((m) => m.method == "AclConnectionChanged")
+        .map((m) => BluetoothDevice.fromJson(Map<String, dynamic>.from(m.arguments)))
+        .listen(_systemConnectionEvents.add);
   }
 
   /// native platform methods channel
@@ -52,6 +56,10 @@ class BluetoothPrintPlus {
   static final _pairState =
       StreamControllerReEmit<PairState>(initialValue: PairState.none);
 
+  /// stream used for the systemConnectionEvents public api
+  static final _systemConnectionEvents =
+      StreamController<BluetoothDevice>.broadcast();
+
   /// stream used for the isBlueOn public api
   static final _blueState =
       StreamControllerReEmit<BlueState>(initialValue: BlueState.blueOn);
@@ -72,6 +80,12 @@ class BluetoothPrintPlus {
 
   /// returns pair/bond state as a stream (Android only; never emitted on iOS)
   static Stream<PairState> get pairState => _pairState.stream;
+
+  /// emits a [BluetoothDevice] whenever any Classic BT device connects or
+  /// disconnects at the system level (Android only; not emitted on iOS).
+  /// Check [BluetoothDevice.isConnected] to distinguish connect from disconnect.
+  static Stream<BluetoothDevice> get systemConnectionEvents =>
+      _systemConnectionEvents.stream;
 
   /// returns blue state as a stream
   static Stream<BlueState> get blueState => _blueState.stream;
