@@ -64,6 +64,7 @@ public class BluetoothPrintPlusPlugin
   private Result pendingResult;
   public PortManager portManager = null;
   private BluetoothAdapter mBluetoothAdapter;
+  private String connectedAddress = null;
 
   private FlutterPluginBinding pluginBinding;
   private ActivityPluginBinding activityBinding;
@@ -260,6 +261,11 @@ public class BluetoothPrintPlusPlugin
         map.put("name", device.getName() != null ? device.getName() : "");
         map.put("address", device.getAddress());
         map.put("type", device.getType());
+        android.bluetooth.BluetoothClass btClass = device.getBluetoothClass();
+        map.put("majorClass", btClass != null ? btClass.getMajorDeviceClass() : 0);
+        map.put("deviceClass", btClass != null ? btClass.getDeviceClass() : 0);
+        map.put("bondState", device.getBondState());
+        map.put("isConnected", device.getAddress().equals(connectedAddress));
         devices.add(map);
       }
       result.success(devices);
@@ -352,6 +358,8 @@ public class BluetoothPrintPlusPlugin
     android.bluetooth.BluetoothClass btClass = device.getBluetoothClass();
     ret.put("majorClass", btClass != null ? btClass.getMajorDeviceClass() : 0);
     ret.put("deviceClass", btClass != null ? btClass.getDeviceClass() : 0);
+    ret.put("bondState", device.getBondState());
+    ret.put("isConnected", device.getAddress().equals(connectedAddress));
     new Handler(Looper.getMainLooper()).post(() -> {
       if (!ret.isEmpty()) {
         channel.invokeMethod("ScanResult", ret);
@@ -397,6 +405,7 @@ public class BluetoothPrintPlusPlugin
                     @Override
                     public void onSuccess(PrinterDevices printerDevices) {
                       // LogUtils.d(TAG, "onSuccess");
+                      connectedAddress = mac;
                       sink.success(BPPState.DeviceConnected.getValue());
                     }
 
@@ -415,6 +424,7 @@ public class BluetoothPrintPlusPlugin
                     @Override
                     public void onDisconnect() {
                       // LogUtils.d(TAG, "onDisconnect");
+                      connectedAddress = null;
                       sink.success(BPPState.DeviceDisconnected.getValue());
                     }
                   })
