@@ -349,6 +349,9 @@ public class BluetoothPrintPlusPlugin
     ret.put("address", device.getAddress());
     ret.put("name", device.getName());
     ret.put("type", device.getType());
+    android.bluetooth.BluetoothClass btClass = device.getBluetoothClass();
+    ret.put("majorClass", btClass != null ? btClass.getMajorDeviceClass() : 0);
+    ret.put("deviceClass", btClass != null ? btClass.getDeviceClass() : 0);
     new Handler(Looper.getMainLooper()).post(() -> {
       if (!ret.isEmpty()) {
         channel.invokeMethod("ScanResult", ret);
