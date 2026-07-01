@@ -164,6 +164,15 @@ class EnumTool {
     }
   }
 
+  /// getPairState — maps a raw Android bond state int to [PairState].
+  static PairState getPairState(int value) {
+    switch (value) {
+      case 11: return PairState.bonding;
+      case 12: return PairState.bonded;
+      default: return PairState.none;
+    }
+  }
+
   /// getMajorClass — maps a raw Android BluetoothClass.Device.Major int to [BluetoothMajorClass].
   static BluetoothMajorClass getMajorClass(int value) {
     switch (value) {
