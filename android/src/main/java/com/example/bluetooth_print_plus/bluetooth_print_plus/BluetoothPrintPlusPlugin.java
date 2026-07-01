@@ -64,6 +64,7 @@ public class BluetoothPrintPlusPlugin
   private Result pendingResult;
   public PortManager portManager = null;
   private BluetoothAdapter mBluetoothAdapter;
+  private String connectedAddress = null;
 
   private FlutterPluginBinding pluginBinding;
   private ActivityPluginBinding activityBinding;
@@ -221,6 +222,8 @@ public class BluetoothPrintPlusPlugin
       filter.addAction(BluetoothDevice.ACTION_FOUND);
       filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
       filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+      filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+      filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
       context.registerReceiver(mFindBlueToothReceiver, filter);
     } catch (Exception ignored) {
 
@@ -246,6 +249,12 @@ public class BluetoothPrintPlusPlugin
         int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE);
         new Handler(Looper.getMainLooper()).post(() ->
             channel.invokeMethod("PairResult", bondState));
+      } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        if (device != null) invokeAclConnectionChanged(device, true);
+      } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        if (device != null) invokeAclConnectionChanged(device, false);
       }
     }
   };
@@ -260,6 +269,11 @@ public class BluetoothPrintPlusPlugin
         map.put("name", device.getName() != null ? device.getName() : "");
         map.put("address", device.getAddress());
         map.put("type", device.getType());
+        android.bluetooth.BluetoothClass btClass = device.getBluetoothClass();
+        map.put("majorClass", btClass != null ? btClass.getMajorDeviceClass() : 0);
+        map.put("deviceClass", btClass != null ? btClass.getDeviceClass() : 0);
+        map.put("bondState", device.getBondState());
+        map.put("isConnected", device.getAddress().equals(connectedAddress));
         devices.add(map);
       }
       result.success(devices);
@@ -349,6 +363,11 @@ public class BluetoothPrintPlusPlugin
     ret.put("address", device.getAddress());
     ret.put("name", device.getName());
     ret.put("type", device.getType());
+    android.bluetooth.BluetoothClass btClass = device.getBluetoothClass();
+    ret.put("majorClass", btClass != null ? btClass.getMajorDeviceClass() : 0);
+    ret.put("deviceClass", btClass != null ? btClass.getDeviceClass() : 0);
+    ret.put("bondState", device.getBondState());
+    ret.put("isConnected", device.getAddress().equals(connectedAddress));
     new Handler(Looper.getMainLooper()).post(() -> {
       if (!ret.isEmpty()) {
         channel.invokeMethod("ScanResult", ret);
@@ -356,6 +375,20 @@ public class BluetoothPrintPlusPlugin
         LogUtils.w(TAG, "invokeMethodUIThread: tried to call method on closed channel: " + "ScanResult");
       }
     });
+  }
+
+  private void invokeAclConnectionChanged(BluetoothDevice device, boolean connected) {
+    final Map<String, Object> ret = new HashMap<>();
+    ret.put("address", device.getAddress());
+    ret.put("name", device.getName() != null ? device.getName() : "");
+    ret.put("type", device.getType());
+    android.bluetooth.BluetoothClass btClass = device.getBluetoothClass();
+    ret.put("majorClass", btClass != null ? btClass.getMajorDeviceClass() : 0);
+    ret.put("deviceClass", btClass != null ? btClass.getDeviceClass() : 0);
+    ret.put("bondState", device.getBondState());
+    ret.put("isConnected", connected);
+    new Handler(Looper.getMainLooper()).post(() ->
+        channel.invokeMethod("AclConnectionChanged", ret));
   }
 
   private void startScan() throws IllegalStateException {
@@ -394,6 +427,7 @@ public class BluetoothPrintPlusPlugin
                     @Override
                     public void onSuccess(PrinterDevices printerDevices) {
                       // LogUtils.d(TAG, "onSuccess");
+                      connectedAddress = mac;
                       sink.success(BPPState.DeviceConnected.getValue());
                     }
 
@@ -412,6 +446,7 @@ public class BluetoothPrintPlusPlugin
                     @Override
                     public void onDisconnect() {
                       // LogUtils.d(TAG, "onDisconnect");
+                      connectedAddress = null;
                       sink.success(BPPState.DeviceDisconnected.getValue());
                     }
                   })

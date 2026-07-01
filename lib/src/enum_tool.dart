@@ -8,6 +8,23 @@ enum ConnectState { connected, disconnected }
 /// On iOS, pairing is OS-managed; this state is never emitted.
 enum PairState { none, bonding, bonded }
 
+/// Major Bluetooth device class — mirrors BluetoothClass.Device.Major on Android.
+/// Always [unknown] on iOS (CoreBluetooth does not expose device class).
+enum BluetoothMajorClass {
+  misc,          // 0x0000
+  computer,      // 0x0100
+  phone,         // 0x0200
+  networking,    // 0x0300
+  audioVideo,    // 0x0400 — headsets, speakers, headphones
+  peripheral,    // 0x0500 — keyboards, mice
+  imaging,       // 0x0600 — printers, scanners, cameras
+  wearable,      // 0x0700
+  toy,           // 0x0800
+  health,        // 0x0900
+  uncategorized, // 0x1F00
+  unknown,
+}
+
 /// Rotation
 enum Rotation { r_0, r_90, r_180, r_270 }
 
@@ -144,6 +161,33 @@ class EnumTool {
         return 1;
       case Alignment.right:
         return 2;
+    }
+  }
+
+  /// getPairState — maps a raw Android bond state int to [PairState].
+  static PairState getPairState(int value) {
+    switch (value) {
+      case 11: return PairState.bonding;
+      case 12: return PairState.bonded;
+      default: return PairState.none;
+    }
+  }
+
+  /// getMajorClass — maps a raw Android BluetoothClass.Device.Major int to [BluetoothMajorClass].
+  static BluetoothMajorClass getMajorClass(int value) {
+    switch (value) {
+      case 0x0000: return BluetoothMajorClass.misc;
+      case 0x0100: return BluetoothMajorClass.computer;
+      case 0x0200: return BluetoothMajorClass.phone;
+      case 0x0300: return BluetoothMajorClass.networking;
+      case 0x0400: return BluetoothMajorClass.audioVideo;
+      case 0x0500: return BluetoothMajorClass.peripheral;
+      case 0x0600: return BluetoothMajorClass.imaging;
+      case 0x0700: return BluetoothMajorClass.wearable;
+      case 0x0800: return BluetoothMajorClass.toy;
+      case 0x0900: return BluetoothMajorClass.health;
+      case 0x1F00: return BluetoothMajorClass.uncategorized;
+      default: return BluetoothMajorClass.unknown;
     }
   }
 }
