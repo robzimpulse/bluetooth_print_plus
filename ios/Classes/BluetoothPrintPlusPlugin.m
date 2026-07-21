@@ -115,6 +115,17 @@ typedef NS_ENUM(NSInteger, BPPState) {
         } @catch(FlutterError *e) {
             result(e);
         }
+    } else if([@"getBondedDevices" isEqualToString:call.method]) {
+        // iOS does not expose a bonded/paired device list for Classic BT to third-party apps.
+        result(@[]);
+    } else if([@"pair" isEqualToString:call.method]) {
+        result([FlutterError errorWithCode:@"not_supported"
+                                  message:@"Pairing is managed by the OS on iOS"
+                                  details:nil]);
+    } else if([@"unpair" isEqualToString:call.method]) {
+        result([FlutterError errorWithCode:@"not_supported"
+                                  message:@"Unpairing is managed by the OS on iOS"
+                                  details:nil]);
     } else if([@"disconnect" isEqualToString:call.method]) {
         @try {
             [Manager close];
