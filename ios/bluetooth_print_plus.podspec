@@ -40,5 +40,19 @@ A new Flutter project.
   s.static_framework = true
 
   # Flutter.framework does not contain a i386 slice.
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
+  #
+  # HEADER_SEARCH_PATHS points at the vendored framework's own Headers dir
+  # because Classes/ imports GSDK headers two different ways: angled
+  # (`<GSDK/BLEConnecter.h>`, resolved via FRAMEWORK_SEARCH_PATHS) and quoted
+  # (`"CPCLCommand.h"` / `"EscCommand.h"` / `"TscCommand.h"`). The GSDK pod used
+  # to publish all 11 headers into Pods/Headers/Public/GSDK, which put them on
+  # the header search path and made both forms resolve. `vendored_frameworks`
+  # contributes only framework search paths, so without this the quoted imports
+  # fail with "'CPCLCommand.h' file not found". Both forms now resolve to the
+  # same physical files, so nothing is declared twice.
+  s.pod_target_xcconfig = {
+    'DEFINES_MODULE' => 'YES',
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+    'HEADER_SEARCH_PATHS' => '$(inherited) "$(PODS_TARGET_SRCROOT)/Frameworks/GSDK.framework/Headers"',
+  }
 end
