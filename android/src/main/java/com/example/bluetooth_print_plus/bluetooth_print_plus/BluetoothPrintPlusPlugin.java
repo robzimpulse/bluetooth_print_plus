@@ -186,12 +186,22 @@ public class BluetoothPrintPlusPlugin
         result.success(null);
         break;
       case "write":
-        byte[] bytes = call.argument("data");
-        try {
-          result.success(write(bytes));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
+        final byte[] bytes = call.argument("data");
+        // Run the blocking Bluetooth socket write off the platform main thread
+        // to avoid ANRs when the printer is slow or unreachable. The
+        // MethodChannel result must be delivered back on the main thread.
+        ThreadPoolManager.getInstance().addTask(new Runnable() {
+          @Override
+          public void run() {
+            final Handler mainHandler = new Handler(Looper.getMainLooper());
+            try {
+              final boolean success = write(bytes);
+              mainHandler.post(() -> result.success(success));
+            } catch (IOException e) {
+              mainHandler.post(() -> result.error("write_error", e.getMessage(), null));
+            }
+          }
+        });
         break;
       default:
         result.notImplemented();
