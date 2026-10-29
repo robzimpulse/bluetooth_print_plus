@@ -361,9 +361,23 @@ public class BluetoothPrintPlusPlugin
     });
   }
 
+  /**
+   * Sends raw bytes to the connected printer. Called from the "write" task on
+   * the ThreadPoolManager worker, never from the platform main thread.
+   *
+   * Printer.portManager is null until a connect opens a port and again after
+   * "disconnect" (Printer.close), and the Dart side's isConnected lags behind
+   * it. Read it once (close() may null it concurrently) and report "not
+   * connected" as an IOException, so the caller replies "write_error" to Dart
+   * instead of an NPE escaping the worker thread and crashing the app.
+   */
   @SuppressWarnings("unchecked")
   private boolean write(byte[] data) throws IOException {
-    boolean result = Printer.getPortManager().writeDataImmediately(data);
+    PortManager port = Printer.getPortManager();
+    if (port == null) {
+      throw new IOException("printer is not connected");
+    }
+    boolean result = port.writeDataImmediately(data);
     LogUtils.d(TAG, result ? "发送成功": "发送失败");
     return result;
   }
