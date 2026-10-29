@@ -18,41 +18,37 @@ A new Flutter project.
   s.static_framework = true
   s.dependency 'Flutter'
 
-  # GSDK is vendored rather than pulled in as a pod dependency.
+  # GSDK is vendored as an xcframework rather than pulled in as a pod
+  # dependency, for two independent reasons.
   #
-  # GSDK 0.0.7's published podspec sources it from
-  # https://gitee.com/besthandset/gsdk.git, and gitee now rejects anonymous
-  # HTTPS clones of that repo ("reject by [gitee]"). Since `Pods/` is not
-  # committed, every fresh `pod install` had to clone it, so git fell back to an
-  # interactive credential prompt and the install hung on
-  # "Username for 'https://gitee.com'".
+  # 1. Its published podspec sources it from
+  #    https://gitee.com/besthandset/gsdk.git, and gitee now rejects anonymous
+  #    HTTPS clones ("reject by [gitee]"). Since `Pods/` is not committed, every
+  #    fresh `pod install` had to clone it, so git fell back to an interactive
+  #    prompt and hung on "Username for 'https://gitee.com'".
   #
-  # The framework below is GSDK 0.0.7 exactly as that pod installed it
-  # (binary sha256 ce37a14a2084883dee1dc5fec07b7fbef212ffb34830ba96534d3c6c1ebd38fa,
-  # from a checkout resolved against podspec checksum
-  # 65d54603da7bece31b433c0f34f8a52c4431dd08). The pod was header-only source
-  # plus this prebuilt static framework, so vendoring it loses nothing.
+  # 2. Every slice of the original library — arm64 included — is tagged
+  #    LC_VERSION_MIN_IPHONEOS, i.e. iOS *device*. Xcode will not link a
+  #    device-tagged arm64 slice into an arm64 simulator build, and Xcode 26
+  #    ships only arm64-only simulator runtimes, so the old x86_64 escape hatch
+  #    is gone. Consumers previously worked around this with
+  #    EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64, which stopped working the
+  #    moment no x86_64 simulator existed.
   #
-  # `#import <GSDK/...>` in Classes/ keeps working: CocoaPods puts a vendored
-  # framework's directory on FRAMEWORK_SEARCH_PATHS for this target.
-  s.vendored_frameworks = 'Frameworks/GSDK.framework'
+  # The xcframework carries the real library for `ios-arm64` (device builds are
+  # bit-for-bit unaffected) and a no-op stub for
+  # `ios-arm64_x86_64-simulator`. Nothing is lost: GSDK drives a Bluetooth
+  # printer and simulators have no Bluetooth, so that path was never usable
+  # there. See tool/gsdk-simulator-stub/ for the stub source and the script that
+  # regenerates this artifact.
+  #
+  # Classes/ imports GSDK exclusively as `<GSDK/Header.h>`, which resolves via
+  # FRAMEWORK_SEARCH_PATHS against whichever slice is selected for the current
+  # SDK. No HEADER_SEARCH_PATHS entry is needed.
+  s.vendored_frameworks = 'Frameworks/GSDK.xcframework'
   s.platform = :ios, '11.0'
   s.static_framework = true
 
   # Flutter.framework does not contain a i386 slice.
-  #
-  # HEADER_SEARCH_PATHS points at the vendored framework's own Headers dir
-  # because Classes/ imports GSDK headers two different ways: angled
-  # (`<GSDK/BLEConnecter.h>`, resolved via FRAMEWORK_SEARCH_PATHS) and quoted
-  # (`"CPCLCommand.h"` / `"EscCommand.h"` / `"TscCommand.h"`). The GSDK pod used
-  # to publish all 11 headers into Pods/Headers/Public/GSDK, which put them on
-  # the header search path and made both forms resolve. `vendored_frameworks`
-  # contributes only framework search paths, so without this the quoted imports
-  # fail with "'CPCLCommand.h' file not found". Both forms now resolve to the
-  # same physical files, so nothing is declared twice.
-  s.pod_target_xcconfig = {
-    'DEFINES_MODULE' => 'YES',
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'HEADER_SEARCH_PATHS' => '$(inherited) "$(PODS_TARGET_SRCROOT)/Frameworks/GSDK.framework/Headers"',
-  }
+  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
 end

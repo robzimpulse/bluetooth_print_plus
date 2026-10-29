@@ -1,7 +1,7 @@
 #import "BluetoothPrintPlusPlugin.h"
 #import "ConnecterManager.h"
-#import "EscCommand.h"
-#import "TscCommand.h"
+#import <GSDK/EscCommand.h>
+#import <GSDK/TscCommand.h>
 #import "TscCommandPlugin.h"
 #import "CpclCommandPlugin.h"
 #import "EscCommandPlugin.h"

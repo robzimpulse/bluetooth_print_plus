@@ -6,7 +6,7 @@
 //
 
 #import "EscCommandPlugin.h"
-#import "EscCommand.h"
+#import <GSDK/EscCommand.h>
 
 @interface EscCommandPlugin ()
 

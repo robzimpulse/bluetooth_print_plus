@@ -6,7 +6,7 @@
 //
 
 #import "cpclCommandPlugin.h"
-#import "CPCLCommand.h"
+#import <GSDK/CPCLCommand.h>
 
 @interface CpclCommandPlugin ()
 

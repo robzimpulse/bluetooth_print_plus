@@ -6,7 +6,7 @@
 //
 
 #import "TscCommandPlugin.h"
-#import "TscCommand.h"
+#import <GSDK/TscCommand.h>
 
 @interface TscCommandPlugin ()
 
