@@ -13,7 +13,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -58,7 +57,6 @@ public class BluetoothPrintPlusPlugin
   private final Object initializationLock = new Object();
   private Context context;
   private Activity activity;
-  private Result pendingResult;
   public PortManager portManager = null;
   private BluetoothAdapter mBluetoothAdapter;
 
@@ -256,16 +254,46 @@ public class BluetoothPrintPlusPlugin
     }
   }
 
+  /**
+   * Returns the runtime permissions a Bluetooth scan needs, per Android
+   * version. On API 31+ (Android 12) the legacy {@code BLUETOOTH} and {@code
+   * BLUETOOTH_ADMIN} constants are replaced by {@code BLUETOOTH_SCAN} and
+   * {@code BLUETOOTH_CONNECT}; they always read as denied below API 31, so
+   * checking the full list on old devices would break scanning entirely
+   * (crash ticket: fatal SecurityException in startDiscovery when the user
+   * denies "Nearby devices" on Android 12+).
+   *
+   * <p>Used by {@link #startScan(Result)} before requesting permissions and
+   * by {@link #onRequestPermissionsResult} to re-verify the grant.
+   */
+  private static String[] scanPermissions() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      return new String[] {
+          Manifest.permission.BLUETOOTH_SCAN,
+          Manifest.permission.BLUETOOTH_CONNECT,
+          Manifest.permission.ACCESS_FINE_LOCATION,
+      };
+    }
+    return new String[] {
+        Manifest.permission.BLUETOOTH,
+        Manifest.permission.BLUETOOTH_ADMIN,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+    };
+  }
+
+  /**
+   * Handles the Dart "startScan" call: requests the version-aware scan
+   * permission list ({@link #scanPermissions()}) when missing, then starts
+   * discovery. On Android 12+ a denied "Nearby devices" grant used to reach
+   * startDiscovery() anyway (the old code only checked grantResults[0],
+   * which is always granted on 12+) and crashed the app with a fatal
+   * SecurityException; the re-check in onRequestPermissionsResult now
+   * prevents that.
+   */
   private void startScan(Result result) {
     LogUtils.i(TAG, "start scan...");
     try {
-      String[] perms = {
-          Manifest.permission.BLUETOOTH,
-          Manifest.permission.BLUETOOTH_ADMIN,
-          Manifest.permission.BLUETOOTH_CONNECT,
-          Manifest.permission.BLUETOOTH_SCAN,
-          Manifest.permission.ACCESS_FINE_LOCATION,
-      };
+      String[] perms = scanPermissions();
       if (EasyPermissions.hasPermissions(this.context, perms)) {
         // Already have permission, do the thing
         startScan();
@@ -297,8 +325,20 @@ public class BluetoothPrintPlusPlugin
     });
   }
 
+  /**
+   * Starts Bluetooth discovery. Must only be called once every permission
+   * from {@link #scanPermissions()} is granted: on Android 12+,
+   * startDiscovery() without BLUETOOTH_SCAN throws a fatal
+   * SecurityException. The catch is a last-resort guard so a race (e.g. the
+   * user revoking the permission between the check and this call) logs
+   * instead of crashing the app.
+   */
   private void startScan() throws IllegalStateException {
-    mBluetoothAdapter.startDiscovery();
+    try {
+      mBluetoothAdapter.startDiscovery();
+    } catch (SecurityException e) {
+      LogUtils.e(TAG, "startDiscovery failed: scan permissions not granted: " + e.getMessage());
+    }
   }
 
   private void stopScan() {
@@ -382,15 +422,23 @@ public class BluetoothPrintPlusPlugin
     return result;
   }
 
+  /**
+   * Called after the system permission dialog closes for this plugin's
+   * request. The old code trusted grantResults[0], which on Android 12+
+   * corresponds to a legacy Bluetooth permission that is always "granted",
+   * so a denied "Nearby devices" still reached startDiscovery() and crashed
+   * with a fatal SecurityException. Re-verify the whole version-aware list
+   * ({@link #scanPermissions()}) instead: only scan when every permission
+   * is granted, otherwise just log (the Dart side decides what to show).
+   */
   @Override
   public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
     LogUtils.d(TAG, "onRequestPermissionsResult");
     if (requestCode == REQUEST_LOCATION_PERMISSIONS) {
-      if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+      if (EasyPermissions.hasPermissions(this.context, scanPermissions())) {
         startScan();
       } else {
-        pendingResult.error("no_permissions", "this plugin requires location permissions for scanning", null);
-        pendingResult = null;
+        LogUtils.w(TAG, "scan permissions denied; discovery not started");
       }
       return true;
     }
