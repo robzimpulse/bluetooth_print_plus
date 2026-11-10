@@ -341,8 +341,20 @@ public class BluetoothPrintPlusPlugin
     }
   }
 
+  /**
+   * Stops Bluetooth discovery. cancelDiscovery() needs the same scan
+   * permission as startDiscovery() on Android 12+ (BLUETOOTH_SCAN), so a
+   * consumer that scanned before the permission was revoked (or denied the
+   * fork's own dialog while its Dart layer already flipped isScanning) must
+   * not crash here 15 s later when the scan timeout fires stopScan: log the
+   * SecurityException instead, mirroring {@link #startScan()}.
+   */
   private void stopScan() {
-    mBluetoothAdapter.cancelDiscovery();
+    try {
+      mBluetoothAdapter.cancelDiscovery();
+    } catch (SecurityException e) {
+      LogUtils.e(TAG, "cancelDiscovery failed: scan permissions not granted: " + e.getMessage());
+    }
   }
 
   public void connect(final String mac) {
